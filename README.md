@@ -16,7 +16,7 @@ of problems.
 
 ## Example Pentomino Solver
 ```python
-from pentomino import PentominoPuzzle
+from pentomino import Puzzle
 
 BOARD = """
 ⬛⬛🟫🟫🟫⬛⬛
@@ -29,7 +29,7 @@ PIECES = """
 ⬛🟪⬛ 🟦🟦🟦 🟥🟥⬛ 🟨🟨⬛ ⬛⬛🟩
 """
 
-solver = PentominoPuzzle(BOARD, PIECES, allow_reflections=True)
+solver = Puzzle(BOARD, PIECES, allow_reflections=True)
 solutions = list(solver.find_solutions())
 for board in solutions:
     print(board)
