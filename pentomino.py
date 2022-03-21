@@ -131,24 +131,22 @@ class Shape:
                 self.shape[r+pr][c+pc] = other.shape[pr][pc]
 
 
-class PentominoPuzzle:
+class Puzzle:
 
-    def __init__(self, board, pieces, allow_reflections=False, allow_duplicates=False):
+    def __init__(self, board, pieces, allow_reflections=False, allow_duplicates=False,
+          showx=False, showy=False):
         """ Solve a pentomino placement puzzle using Algorithm X by Donald Knuth. Using
             the implementation of that algorithm by Ali Assaf.
-            > solver = PentominoPuzzle(BOARD, PIECES)
+            > solver = Puzzle(BOARD, PIECES)
             > for board in solver.find_solutions():
             >     print(board)
         """
-        self.board = Shape.fromstr(board, 'board') if isinstance(board, str) else board
+        self.board = Shape.fromstr(board, 'b') if isinstance(board, str) else board
         self.pieces = Shape.fromstr(pieces, 'p<i>') if isinstance(pieces, str) else pieces
-        self.allow_reflections = allow_reflections  # Set true to allow piece reflections
-        self.allow_duplicates = allow_duplicates    # Set true to allow piece duplicates
-        
-    def init_pieces(self, pieces):
-        """ Convert the single pieces string into a list of Piece objects. """
-        shapes = list(zip(*[r.split() for r in pieces.strip().split('\n')]))
-        return [Shape(shape, f'p{i+1}') for i, shape in enumerate(shapes)]
+        self.allow_reflections = allow_reflections      # Set true to allow piece reflections
+        self.allow_duplicates = allow_duplicates        # Set true to allow piece duplicates
+        self.showx = showx      # Show the X-Contraint values
+        self.showy = showy      # Show the Y-Universe values
     
     def update_board(self, piece, r, c):
         """ Place the piece in the board at the specified starting r,c. """
@@ -163,9 +161,12 @@ class PentominoPuzzle:
         #    corresponding squares in the board: ij, where i is the rank and j is the file.
         # Pieces: For each of the pieces, there is the constraint that it must be placed
         #    exactly once. Name these constraints after their piece names: p1, p2, p3, ...
-        X = [('b',(r,c)) for r,c in self.board.coords()]
+        # Squares: For each square, we can only place one piece. This is only used
+        #    if we allow empty squares.
+        X = []
+        X += [('b',r,c) for r,c in self.board.coords()]
         if not self.allow_duplicates:
-            X += [('p',piece.name) for piece in self.pieces]
+            X += [(p.name,) for p in self.pieces]
         # Y-Universe
         # For every Row-Column-PieceRotation set, list which constraints it satisfies
         # in the definition of X above.
@@ -174,9 +175,13 @@ class PentominoPuzzle:
             for rotation in piece.rotations(self.allow_reflections):
                 for r, c in itertools.product(self.board.rows, self.board.cols):
                     if positions := self.board.positions(rotation, r, c):
-                        Y[(rotation,r,c)] = [('b',(r,c)) for r,c in positions]
+                        Y[(rotation,r,c)] = []
+                        Y[(rotation,r,c)] += [('b',r,c) for r,c in positions]
                         if not self.allow_duplicates:
-                            Y[(rotation,r,c)] += [('p',piece.name)]
+                            Y[(rotation,r,c)] += [(piece.name,)]
+        # Display debug info
+        if self.showx: print('--- X-Contraints ---\n ' + '\n '.join([str(x) for x in X]))
+        if self.showy: print('--- Y-Universe ---\n ' + '\n '.join([str(y) for y in Y]))
         # Solve it!
         X = exact_cover(X, Y)
         for solution_keys in solve(X, Y, []):
@@ -193,7 +198,7 @@ if __name__ == '__main__':
     opts = dict(vars(parser.parse_args()))
     # Run the example puzzle
     starttime = time.time()
-    solver = PentominoPuzzle(EXAMPLE_BOARD, EXAMPLE_PIECES, **opts)
+    solver = Puzzle(EXAMPLE_BOARD, EXAMPLE_PIECES, **opts)
     solutions = list(solver.find_solutions())
     for board in solutions:
         print(board)
