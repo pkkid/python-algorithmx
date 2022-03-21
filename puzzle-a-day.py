@@ -17,6 +17,7 @@ BASEDIFFICULTY = 24341
 
 
 def rgb(text, color='#aaa'):
+    if color is None: return text
     r,g,b = tuple(int(x*2, 16) for x in color.lstrip('#'))
     return f'\033[38;2;{r};{g};{b}m{text}\033[00m'
 
@@ -31,7 +32,7 @@ def find_solutions_for_year(puzzle, year, num_procs=4):
                 procs[date] = multipool.apply_async(find_solutions_for_date, (puzzle, date))
                 date += datetime.timedelta(days=1)
             for date, proc in procs.items():
-                _solutions, count = proc.get(timeout=60)
+                _solutions, count = proc.get(timeout=300)
                 color = None if count else '#c00'
                 print(rgb(f'{date.strftime("%b %d")}: Found {count} solutions', color))
                 solutions[date] = _solutions
@@ -39,9 +40,10 @@ def find_solutions_for_year(puzzle, year, num_procs=4):
         print(' KeyboardInterrupt; Stopping..')
     # Print a Summary of our findings
     numdays = len(solutions)
-    total = sum([len(solutions) for solutions in solutions.values()])
-    print(f'Average: {total / numdays}')
+    total = sum([len(d) for d in solutions.values()])
+    print(f'Average: {round(total/numdays, 2)}')
     print(f'Total: {total}')
+    print(f'No Solutuion: {sum([1 for d in solutions.values() if len(d) == 0])}')
     print(f'Difficulty: {round(total/BASEDIFFICULTY, 2)}x Dragonfjord')
     return solutions, total
 
@@ -111,5 +113,5 @@ if __name__ == '__main__':
     # Print the results
     if not opts.year and total: print(random.choice(solutions))
     runtime = round(time.time() - starttime, 1)
-    print(f'Found {total} solutions after {runtime}s.')
+    print(f'Found {total} solutions after {runtime}s')
     
