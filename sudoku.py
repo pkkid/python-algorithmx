@@ -36,10 +36,10 @@ def solve_sudoku(grid):
     # cn: Column-Number: Each column must contain each number exactly once.
     # bn: Box-Number: Each box must contain each number exactly once.
     X = (
-        [('rc', rc) for rc in product(rows, cols)] +
-        [('rn', rn) for rn in product(rows, nums)] +
-        [('cn', cn) for cn in product(cols, nums)] +
-        [('bn', bn) for bn in product(boxes, nums)]
+        [('rc', rc) for rc in product(rows, cols)]
+        + [('rn', rn) for rn in product(rows, nums)]
+        + [('cn', cn) for cn in product(cols, nums)]
+        + [('bn', bn) for bn in product(boxes, nums)]
     )
     # Y-Universe
     # For every Row-Column-Number set, list which constraints it satisfies
