@@ -123,7 +123,7 @@ if __name__ == '__main__':
     else:
         date = datetime.datetime.strptime(opts.date, r'%Y-%m-%d').date() if opts.date else None
         solutions, total = find_solutions_for_date(board, pieces, date)
-        print(random.choice(solutions))
+        print(f'\n{random.choice(solutions)}')
     runtime = round(time.time() - starttime, 1)
     print(f'Found {total} solutions after {runtime}s')
     
