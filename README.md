@@ -42,10 +42,10 @@ for board in solutions:
 ```
 
 ## Example Dragonfjord Command Line Solver
-Only show a single random solution is displayed when running from the command line
+Only a single random solution is displayed when running from the command line
 as seeing all solutions was a bit unwieldy.
 ```bash
-> python3 dragonfjord.py --month=5 --day=29
+> python3 puzzle-a-day.py --date=2025-05-29
 🟦🟦🟦🟦⬛🟧⬛
 🟨🟦🟨🟧🟧🟧⬛
 🟨🟨🟨🟧⬜⬜⬜
@@ -56,6 +56,10 @@ as seeing all solutions was a bit unwieldy.
 
 Found 66 solutions after 5.5s.
 ```
+
+To view all available options, run `python3 puzzle-a-day.py --help`. Available
+options for `--puzzle` are `dragonfjord` and `guanglu`, see `puzzle-a-day.ini`
+for the puzzle layouts.
 
 ## Example Sudoku Solver
 This solver is not my code, but Ali Assaf's. Copied from his posted example,
