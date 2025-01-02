@@ -113,7 +113,7 @@ if __name__ == '__main__':
     # Validate the arguments
     starttime = time.time()
     puzzles = configparser.ConfigParser()
-    puzzles.read('puzzle-a-day.ini')
+    puzzles.read('puzzle-a-day.ini',encoding='utf-8')
     board = puzzles[opts.puzzle]['board']
     pieces = puzzles[opts.puzzle][opts.set]
     print(f'{board}\n{pieces}')
