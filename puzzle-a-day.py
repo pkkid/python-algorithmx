@@ -41,7 +41,7 @@ def print_summary(solutions):
     print(f'total:{total}, avg:{avgcount}, min:{mincount}, max:{maxcount}, zero:{zerocount}')
 
 
-def find_solutions_for_year(board, pieces, year, num_procs=4):
+def find_solutions_for_year(board, pieces, year, opts, num_procs=4):
     """ This function finds solutions for a given puzzle for each day of a
         specified year. It uses multiprocessing to speed up the process, with
         the number of processes defaulting to 4 but customizable.
@@ -52,7 +52,7 @@ def find_solutions_for_year(board, pieces, year, num_procs=4):
         with multiprocessing.Pool(processes=num_procs) as multipool:
             date = datetime.date(year, 1, 1)
             while date.year == year:
-                procs[date] = multipool.apply_async(find_solutions_for_date, (board, pieces, date))
+                procs[date] = multipool.apply_async(find_solutions_for_date, (board, pieces, date, opts))
                 date += datetime.timedelta(days=1)
             for date, proc in procs.items():
                 _solutions, count = proc.get(timeout=300)
@@ -65,7 +65,7 @@ def find_solutions_for_year(board, pieces, year, num_procs=4):
     return solutions, total
 
 
-def find_solutions_for_date(board, pieces, date):
+def find_solutions_for_date(board, pieces, date, opts):
     """ Find the solutions for the specified date. """
     try:
         board = pentomino.Shape.fromstr(board, 'board') if isinstance(board, str) else board
@@ -119,10 +119,10 @@ if __name__ == '__main__':
     print(f'{board}\n{pieces}')
     # Process for the full year or a single date
     if opts.year:
-        solutions, total = find_solutions_for_year(board, pieces, opts.year, opts.procs)
+        solutions, total = find_solutions_for_year(board, pieces, opts.year, opts, opts.procs)
     else:
         date = datetime.datetime.strptime(opts.date, r'%Y-%m-%d').date() if opts.date else None
-        solutions, total = find_solutions_for_date(board, pieces, date)
+        solutions, total = find_solutions_for_date(board, pieces, date, opts)
         print(f'\n{random.choice(solutions)}')
     runtime = round(time.time() - starttime, 1)
     print(f'Found {total} solutions after {runtime}s')
