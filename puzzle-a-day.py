@@ -17,16 +17,25 @@ def rgb(text, color='#aaa'):
     return f'\033[38;2;{r};{g};{b}m{text}\033[00m'
 
 
-def print_value(date, count):
+def print_value(date, count, only_zeros):
     """ Print the value for the specified date in a calendar format. """
     color = None if count else '#c00'
-    if date.day == 1:
-        print()
-        print(f'\n{date.strftime("%B")}')
-        print('     '*date.weekday(), end='')
-    elif date.weekday() == 0:
-        print()
-    print(rgb(f'{count:4} ', color), end='')
+    if not only_zeros:
+        if date.day == 1:
+            print()
+            print(f'\n{date.strftime("%B")}')
+            print('     '*date.weekday(), end='')
+        elif date.weekday() == 0:
+            print()
+        print(rgb(f'{count:4} ', color), end='')
+    elif only_zeros and count>=1:
+        if date.day == 1:
+            print()
+            print(f'\n{date.strftime("%B")}')
+            print('     '*date.weekday(), end='')
+        elif date.weekday() == 0:
+            print()
+        print(rgb(f'{count:4} ', color), end='')
 
 
 def print_summary(solutions):
@@ -56,7 +65,7 @@ def find_solutions_for_year(board, pieces, year, opts, num_procs=4):
                 date += datetime.timedelta(days=1)
             for date, proc in procs.items():
                 _solutions, count = proc.get(timeout=300)
-                print_value(date, count)
+                print_value(date, count, opts.zero)
                 solutions[date] = _solutions
     except KeyboardInterrupt:
         print('\n\nKeyboardInterrupt; Stopping..')
@@ -75,7 +84,7 @@ def find_solutions_for_date(board, pieces, date, opts):
             allow_duplicates=opts.allow_duplicates,
             showx=opts.showx,
             showy=opts.showy)
-        solutions = list(solver.find_solutions())
+        solutions = list(solver.find_solutions(opts.zero))
         return solutions, len(solutions)
     except KeyboardInterrupt:
         return [], 0
@@ -104,6 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--set', default='set1', help='Piece set to use.')
     parser.add_argument('-d', '--date', help='Date to solve for (YYYY-MM-DD)')
     parser.add_argument('-y', '--year', type=int, help='Run for every day of the year.')
+    parser.add_argument('-z', '--zero', type=bool, default=False, help='Find only unsolvable puzzles.')
     parser.add_argument('--no-reflections', default=False, action='store_true', help='Dont allow pieces to be flipped.')
     parser.add_argument('--allow-duplicates', default=False, action='store_true', help='Allow duplicate pieces.')
     parser.add_argument('--showx', default=False, action='store_true', help='Show the X-Contraint values.')
