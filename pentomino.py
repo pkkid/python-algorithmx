@@ -154,7 +154,7 @@ class Puzzle:
             if piece.shape[pr][pc] != Shape.EMPTY:
                 self.board[r+pr][c+pc] = piece.shape[pr][pc]
 
-    def find_solutions(self):
+    def find_solutions(self, is_it_solvable=None):
         # X-Constraints
         # Board: For each of the board squares, there is the constraint that it must be
         #    covered by a pentomino exactly once. Name these constraints after the
@@ -189,6 +189,8 @@ class Puzzle:
             for rotation, r, c in solution_keys:
                 solution.update(rotation, r, c)
             yield solution
+            if is_it_solvable:
+                return
 
 
 if __name__ == '__main__':
