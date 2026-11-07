@@ -5,7 +5,7 @@ Copyright: (c) 2022 Michael Shepanski
 License: GNU General Public License <http://www.gnu.org/licenses/>
 https://www.dragonfjord.com/product/a-puzzle-a-day/
 """
-import argparse, datetime, random, time
+import argparse, datetime, os, random, time
 import configparser, multiprocessing
 import pentomino
 
@@ -113,7 +113,9 @@ if __name__ == '__main__':
     # Validate the arguments
     starttime = time.time()
     puzzles = configparser.ConfigParser()
-    puzzles.read('puzzle-a-day.ini',encoding='utf-8')
+    # The puzzle definitions live at the repo root, shared with the Rust solver.
+    inipath = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'puzzle-a-day.ini')
+    puzzles.read(inipath, encoding='utf-8')
     board = puzzles[opts.puzzle]['board']
     pieces = puzzles[opts.puzzle][opts.set]
     print(f'{board}\n{pieces}')

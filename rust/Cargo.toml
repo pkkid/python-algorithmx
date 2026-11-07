@@ -1,0 +1,21 @@
+[package]
+name = "puzzle-a-day"
+version = "0.1.0"
+edition = "2024"
+description = "A Puzzle a Day solver using Knuth's Algorithm X (Dancing Links)"
+license = "GPL-3.0-or-later"
+
+[lib]
+name = "puzzle_a_day"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "puzzle-a-day"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

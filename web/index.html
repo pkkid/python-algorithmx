@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Puzzle a Day</title>
+<style>
+  :root {
+    --bg: #f3efe8; --panel: #fffdf9; --text: #2b2724; --muted: #776e66; --border: #e2d9cd;
+    --board: #cdb89c; --board-edge: #b39b7c; --cell: #f2e9dc; --cell-text: #6b5d50;
+    --target: #fff7d6; --target-ring: #d97706; --accent: #2f5fd0; --accent-text: #fff;
+    --shadow: rgba(70, 45, 20, .22); --win: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161412; --panel: #211e1b; --text: #ece6df; --muted: #a59b91; --border: #37312b;
+      --board: #4a3e33; --board-edge: #5c4d3f; --cell: #2c2621; --cell-text: #b6aa9d;
+      --target: #4a3a12; --target-ring: #f59e0b; --accent: #6b93f0; --accent-text: #0e1220;
+      --shadow: rgba(0, 0, 0, .55); --win: #4ade80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161412; --panel: #211e1b; --text: #ece6df; --muted: #a59b91; --border: #37312b;
+    --board: #4a3e33; --board-edge: #5c4d3f; --cell: #2c2621; --cell-text: #b6aa9d;
+    --target: #4a3a12; --target-ring: #f59e0b; --accent: #6b93f0; --accent-text: #0e1220;
+    --shadow: rgba(0, 0, 0, .55); --win: #4ade80;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -.01em; }
+  .sub { margin: 0 0 18px; color: var(--muted); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-bottom: 12px; }
+  .controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+  select, input[type=date], button {
+    font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 11px; min-height: 36px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: default; }
+  .spacer { flex: 1; }
+  #status { min-height: 24px; margin: 4px 0 14px; color: var(--muted); }
+  #status b { color: var(--text); }
+  #status.win { color: var(--win); font-weight: 600; }
+  #play { position: relative; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  #frame {
+    position: absolute; left: 0; top: 0; border-radius: 14px; background: var(--board);
+    box-shadow: inset 0 0 0 2px var(--board-edge), 0 6px 20px var(--shadow); transition: box-shadow .4s;
+  }
+  #frame.win { box-shadow: inset 0 0 0 2px var(--board-edge), 0 0 0 4px var(--win), 0 6px 26px var(--shadow); }
+  .cell { position: absolute; }
+  .cell span {
+    position: absolute; inset: 3px; border-radius: 7px; background: var(--cell); color: var(--cell-text);
+    display: grid; place-items: center; font-weight: 600; letter-spacing: .02em;
+  }
+  .cell.target span { background: var(--target); color: var(--text); box-shadow: inset 0 0 0 2px var(--target-ring); }
+  .piece {
+    position: absolute; left: 0; top: 0; transform-origin: center; pointer-events: none;
+    transition: transform .5s cubic-bezier(.2, .8, .25, 1);
+    filter: drop-shadow(0 2px 3px var(--shadow));
+  }
+  .piece svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .piece .hit { pointer-events: auto; cursor: grab; }
+  .piece.dragging { transition: none; filter: drop-shadow(0 10px 14px var(--shadow)); }
+  .piece.dragging .hit { cursor: grabbing; }
+  .piece.selected { filter: drop-shadow(0 0 0 var(--accent)) drop-shadow(0 0 3px var(--accent)) drop-shadow(0 2px 3px var(--shadow)); }
+  .piece.loose { opacity: .72; }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  #error { color: #dc2626; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A Puzzle a Day</h1>
+  <p class="sub">Cover every square except the date. Drag pieces onto the board; tap a piece to rotate it, right-click (or <kbd>F</kbd>) to flip it.</p>
+  <div class="controls">
+    <label>Puzzle <select id="puzzle"></select></label>
+    <label>Date <input type="date" id="date"></label>
+    <button id="solve" class="primary" disabled>Solve</button>
+    <button id="shuffle">Shuffle</button>
+    <span class="spacer"></span>
+    <button id="rotate" title="Rotate selected piece (R)">⟳ Rotate</button>
+    <button id="flip" title="Flip selected piece (F)">⇋ Flip</button>
+  </div>
+  <div id="status">Loading solver…</div>
+  <div id="play"><div id="frame"></div></div>
+  <footer id="footer"></footer>
+</main>
+
+<!-- build.sh inlines the WASM module here as base64 for the standalone file. -->
+<script id="wasm-b64" type="application/octet-stream"></script>
+<script>
+'use strict';
+const PAD = 0.3;          // Board frame padding (in cells)
+const GAP = 0.7;          // Space between board and tray (in cells)
+const TRAY_WIDE = 10.5;   // Tray width beside the board on wide screens (in cells)
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WEEKDAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const COLORS = ['#e85d3f','#f2a516','#3fae49','#1f9bd1','#8b5cf6','#e0479e','#a07a4c','#14b8a6','#f97352','#4c6ef5'];
+const $ = id => document.getElementById(id);
+const mod = (a, n) => ((a % n) + n) % n;
+
+let wasm, puzzles, wasmSize = 0;
+const S = {
+  p: 0, s: 0, cell: 50, wide: true, playW: 0, playH: 0,
+  pieces: [], selected: null, z: 10, solutions: null, shown: -1,
+};
+
+// ---------- WASM ----------
+async function loadWasm() {
+  const inline = $('wasm-b64').textContent.trim();
+  const bytes = inline
+    ? Uint8Array.from(atob(inline), c => c.charCodeAt(0))
+    : new Uint8Array(await (await fetch('puzzle_a_day.wasm')).arrayBuffer());
+  wasmSize = bytes.length;
+  const { instance } = await WebAssembly.instantiate(bytes, {});
+  wasm = instance.exports;
+}
+function readJSON(len) {
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, wasm.out_ptr(), len)));
+}
+
+// ---------- Geometry ----------
+function norm(cells) {
+  const mr = Math.min(...cells.map(c => c[0])), mc = Math.min(...cells.map(c => c[1]));
+  return cells.map(([r, c]) => [r - mr, c - mc]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+}
+// Rotate clockwise `rot` times, then mirror left-right. Matches the CSS
+// transform `scaleX(flip) rotate(rot*90deg)` applied to the base shape.
+function orient(base, rot, flip) {
+  let cells = base;
+  for (let i = 0; i < mod(rot, 4); i++) cells = cells.map(([r, c]) => [c, -r]);
+  if (flip) cells = cells.map(([r, c]) => [r, -c]);
+  return norm(cells);
+}
+const cellKey = cells => norm(cells).map(c => c.join(',')).join(';');
+const odims = pc => mod(pc.rot, 2) ? [pc.w, pc.h] : [pc.h, pc.w];   // [rows, cols] as drawn
+
+function puzzle() { return puzzles[S.p]; }
+function selectedDate() {
+  const v = $('date').value;
+  if (v) { const [y, m, d] = v.split('-').map(Number); return { y, m, d }; }
+  const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
+}
+function weekdayOf({ y, m, d }) { return new Date(y, m - 1, d).getDay() + 1; }   // Sunday = 1
+function labelFor(n) {
+  if (n <= 12) return MONTHS[n - 1];
+  if (n <= 43) return String(n - 12);
+  return WEEKDAYS[n - 44] || '';
+}
+function dateCells(date) {
+  const wd = weekdayOf(date);
+  return puzzle().board.filter((_, i) => {
+    const n = i + 1;
+    return n === date.m || n === date.d + 12 || n === wd + 43;
+  });
+}
+function describe(date, withWeekday) {
+  const s = `${MONTHS[date.m - 1]} ${date.d}`;
+  return withWeekday ? `${WEEKDAYS[weekdayOf(date) - 1]} ${s}` : s;
+}
+
+// ---------- Layout ----------
+function frameSize() { const p = puzzle(); return [p.cols + 2 * PAD, p.rows + 2 * PAD]; }   // [w, h]
+function trayOrigin() { const [fw, fh] = frameSize(); return S.wide ? [fw + GAP, 0] : [0, fh + GAP]; }
+function trayWidth() { return S.wide ? TRAY_WIDE : frameSize()[0]; }
+
+function layout(repackIfModeChanged = true) {
+  const main = $('play').parentElement, style = getComputedStyle(main);
+  const avail = main.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const [fw] = frameSize();
+  const wasWide = S.wide;
+  S.wide = avail >= 720;
+  const units = S.wide ? fw + GAP + TRAY_WIDE : fw;
+  S.cell = Math.max(30, Math.min(58, Math.floor(avail / units)));
+  if (repackIfModeChanged && wasWide !== S.wide) packTray(S.pieces.filter(p => !p.placed));
+  sizePlay();
+  drawBoard();
+  S.pieces.forEach(render);
+}
+function sizePlay() {
+  const [fw, fh] = frameSize();
+  const [tx, ty] = trayOrigin();
+  // Leave room for the tallest packing seen so far.
+  S.playW = S.wide ? fw + GAP + TRAY_WIDE : fw;
+  S.playH = Math.max(fh, ty + S.trayH);
+  $('play').style.width = S.playW * S.cell + 'px';
+  $('play').style.height = S.playH * S.cell + 'px';
+}
+
+// ---------- Board ----------
+function drawBoard() {
+  const p = puzzle(), cs = S.cell, [fw, fh] = frameSize();
+  const frame = $('frame');
+  frame.style.width = fw * cs + 'px';
+  frame.style.height = fh * cs + 'px';
+  const targets = new Set(dateCells(selectedDate()).map(c => c.join(',')));
+  frame.innerHTML = p.board.map(([r, c], i) => {
+    const cls = targets.has(r + ',' + c) ? 'cell target' : 'cell';
+    return `<div class="${cls}" style="left:${(PAD + c) * cs}px;top:${(PAD + r) * cs}px;width:${cs}px;height:${cs}px">` +
+      `<span style="font-size:${Math.round(cs * .27)}px">${labelFor(i + 1)}</span></div>`;
+  }).join('');
+}
+
+// ---------- Pieces ----------
+function pieceSVG(base, h, w, color) {
+  const U = 100, g = 5, set = new Set(base.map(c => c.join(',')));
+  const has = (r, c) => set.has(r + ',' + c);
+  let body = '', lines = '';
+  for (const [r, c] of base) {
+    body += `<rect x="${c * U + g}" y="${r * U + g}" width="${U - 2 * g}" height="${U - 2 * g}" rx="16"/>`;
+    if (has(r, c + 1)) body += `<rect x="${c * U + U / 2}" y="${r * U + g}" width="${U}" height="${U - 2 * g}"/>`;
+    if (has(r + 1, c)) body += `<rect x="${c * U + g}" y="${r * U + U / 2}" width="${U - 2 * g}" height="${U}"/>`;
+    if (has(r, c + 1) && has(r + 1, c) && has(r + 1, c + 1))
+      body += `<rect x="${c * U + U / 2}" y="${r * U + U / 2}" width="${U}" height="${U}"/>`;
+    lines += `<rect x="${c * U + 14}" y="${r * U + 14}" width="${U - 28}" height="${U - 28}" rx="10"/>`;
+  }
+  return `<svg viewBox="0 0 ${w * U} ${h * U}" preserveAspectRatio="none">` +
+    `<g class="hit" fill="${color}">${body}</g>` +
+    `<g fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="3">${lines}</g></svg>`;
+}
+
+function buildPieces() {
+  S.pieces.forEach(pc => pc.el.remove());
+  const set = puzzle().sets[S.s];
+  S.pieces = set.pieces.map((piece, i) => {
+    const base = norm(piece.cells);
+    const h = Math.max(...base.map(c => c[0])) + 1, w = Math.max(...base.map(c => c[1])) + 1;
+    const el = document.createElement('div');
+    el.className = 'piece';
+    el.innerHTML = pieceSVG(base, h, w, COLORS[i % COLORS.length]);
+    const pc = { i, base, h, w, rot: 0, flip: false, x: 0, y: 0, placed: null, el };
+    attachEvents(pc);
+    $('play').appendChild(el);
+    return pc;
+  });
+}
+
+function render(pc) {
+  const cs = S.cell, [oh, ow] = odims(pc);
+  // (x, y) is the top-left of the piece as drawn; CSS rotates around the center.
+  const tx = (pc.x + ow / 2 - pc.w / 2) * cs, ty = (pc.y + oh / 2 - pc.h / 2) * cs;
+  pc.el.style.width = pc.w * cs + 'px';
+  pc.el.style.height = pc.h * cs + 'px';
+  pc.el.style.transform = `translate(${tx}px, ${ty}px) scaleX(${pc.flip ? -1 : 1}) rotate(${pc.rot * 90}deg)`;
+  pc.el.classList.toggle('loose', !pc.placed && overBoard(pc));
+}
+
+function packTray(list) {
+  const [tx, ty] = trayOrigin(), tw = trayWidth();
+  let x = 0, y = 0, shelf = 0;
+  for (const pc of list) {
+    const [oh, ow] = odims(pc);
+    if (x > 0 && x + ow > tw + 1e-6) { x = 0; y += shelf + 0.5; shelf = 0; }
+    pc.x = tx + x; pc.y = ty + y; pc.placed = null;
+    x += ow + 0.5; shelf = Math.max(shelf, oh);
+  }
+  S.trayH = Math.max(S.trayH || 0, y + shelf + 0.3);
+}
+
+function shuffle() {
+  const list = [...S.pieces].sort(() => Math.random() - 0.5);
+  for (const pc of list) {
+    // Random orientation, but keep pieces wider than tall so the tray stays compact.
+    pc.flip = Math.random() < 0.5;
+    pc.rot += mod((pc.h > pc.w ? 1 : 0) - pc.rot, 2) + (Math.random() < 0.5 ? 2 : 0);
+  }
+  list.forEach((pc, k) => { pc.el.style.transitionDelay = k * 40 + 'ms'; });
+  packTray(list);
+  sizePlay();
+  S.pieces.forEach(render);
+  setTimeout(() => S.pieces.forEach(pc => { pc.el.style.transitionDelay = ''; }), 900);
+  S.shown = -1;
+  checkWin();
+}
+
+// ---------- Placement rules ----------
+function occupied(except) {
+  const occ = new Set();
+  for (const pc of S.pieces) {
+    if (pc === except || !pc.placed) continue;
+    for (const [r, c] of orient(pc.base, pc.rot, pc.flip)) occ.add((pc.placed[0] + r) + ',' + (pc.placed[1] + c));
+  }
+  return occ;
+}
+function canPlace(pc, r0, c0) {
+  const open = new Set(puzzle().board.map(c => c.join(','))), occ = occupied(pc);
+  return orient(pc.base, pc.rot, pc.flip).every(([r, c]) => {
+    const k = (r0 + r) + ',' + (c0 + c);
+    return open.has(k) && !occ.has(k);
+  });
+}
+function overBoard(pc) {
+  const [oh, ow] = odims(pc), [fw, fh] = frameSize();
+  const cx = pc.x + ow / 2, cy = pc.y + oh / 2;
+  return cx > 0 && cy > 0 && cx < fw && cy < fh;
+}
+// Snap to the grid if the piece is over the board. Returns false if it doesn't fit there.
+function settle(pc) {
+  if (!overBoard(pc)) { pc.placed = null; clamp(pc); return true; }
+  const r0 = Math.round(pc.y - PAD), c0 = Math.round(pc.x - PAD);
+  if (!canPlace(pc, r0, c0)) { pc.placed = null; return false; }
+  pc.placed = [r0, c0]; pc.x = PAD + c0; pc.y = PAD + r0;
+  return true;
+}
+function clamp(pc) {
+  const [oh, ow] = odims(pc);
+  pc.x = Math.min(Math.max(pc.x, 0), S.playW - ow);
+  pc.y = Math.min(Math.max(pc.y, 0), S.playH - oh);
+}
+
+function rotate(pc, turns = 1) {
+  const [oh, ow] = odims(pc);
+  const cx = pc.x + ow / 2, cy = pc.y + oh / 2;
+  pc.rot += pc.flip ? -turns : turns;          // Mirrored pieces turn the other way internally
+  const [nh, nw] = odims(pc);
+  pc.x = cx - nw / 2; pc.y = cy - nh / 2;
+  if (pc.placed) { pc.x = Math.round(pc.x * 2) / 2; pc.y = Math.round(pc.y * 2) / 2; }
+  settle(pc);
+  render(pc);
+  checkWin();
+}
+function flip(pc) {
+  pc.flip = !pc.flip;
+  settle(pc);
+  render(pc);
+  checkWin();
+}
+function select(pc) {
+  if (S.selected) S.selected.el.classList.remove('selected');
+  S.selected = pc;
+  if (pc) { pc.el.classList.add('selected'); pc.el.style.zIndex = ++S.z; }
+}
+
+function attachEvents(pc) {
+  const el = pc.el;
+  el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); select(pc); flip(pc); });
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    select(pc);
+    const start = { px: e.clientX, py: e.clientY, x: pc.x, y: pc.y, placed: pc.placed, moved: false };
+    e.target.setPointerCapture(e.pointerId);
+    const move = ev => {
+      const dx = ev.clientX - start.px, dy = ev.clientY - start.py;
+      if (!start.moved && Math.hypot(dx, dy) < 5) return;
+      if (!start.moved) { start.moved = true; el.classList.add('dragging'); pc.placed = null; }
+      pc.x = start.x + dx / S.cell; pc.y = start.y + dy / S.cell;
+      clamp(pc);
+      render(pc);
+    };
+    const end = ev => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', end);
+      el.removeEventListener('pointercancel', end);
+      el.classList.remove('dragging');
+      if (!start.moved) { rotate(pc); return; }
+      if (ev.type === 'pointercancel' || !settle(pc)) {
+        // Doesn't fit: slide back to where it came from.
+        pc.x = start.x; pc.y = start.y; pc.placed = start.placed;
+      }
+      render(pc);
+      checkWin();
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  });
+}
+
+// ---------- Status ----------
+function setStatus(html, win = false) {
+  $('status').innerHTML = html;
+  $('status').classList.toggle('win', win);
+  $('frame').classList.toggle('win', win);
+}
+function idleStatus() {
+  const date = selectedDate(), hasWeekday = puzzle().board.length > 43;
+  return `Leave only <b>${describe(date, hasWeekday)}</b> showing.`;
+}
+function checkWin() {
+  S.pieces.forEach(pc => pc.el.classList.toggle('loose', !pc.placed && overBoard(pc)));
+  if (!S.pieces.every(pc => pc.placed)) {
+    if (S.shown < 0) setStatus(idleStatus());
+    return;
+  }
+  const occ = occupied(null);
+  const board = puzzle().board;
+  const open = board.map((c, i) => [c, i + 1]).filter(([c]) => !occ.has(c.join(',')));
+  const target = new Set(dateCells(selectedDate()).map(c => c.join(',')));
+  if (open.length === target.size && open.every(([c]) => target.has(c.join(',')))) {
+    const msg = S.shown >= 0
+      ? `Solved! Showing solution <b>${S.shown + 1}</b> of <b>${S.solutions.count}</b> (found in ${S.solveMs < 0.1 ? '<0.1' : S.solveMs.toFixed(1)} ms by Rust → WebAssembly). Press Solve again for another.`
+      : `🎉 You solved ${describe(selectedDate(), board.length > 43)}!`;
+    setStatus(msg, true);
+    return;
+  }
+  const nums = open.map(([, n]) => n);
+  const m = nums.find(n => n <= 12), d = nums.find(n => n > 12 && n <= 43);
+  if (m && d && nums.length === target.size) {
+    setStatus(`All pieces placed, but that solves <b>${MONTHS[m - 1]} ${d - 12}</b> instead.`);
+  } else {
+    setStatus('All pieces placed, but the uncovered squares are not a date.');
+  }
+}
+
+// ---------- Solve ----------
+function solve() {
+  const date = selectedDate();
+  if (!S.solutions) {
+    const t0 = performance.now();
+    const len = wasm.solve(S.p, S.s, date.m, date.d, weekdayOf(date), 1, 0);
+    S.solveMs = performance.now() - t0;
+    S.solutions = readJSON(len);
+    S.shown = -1;
+  }
+  const { count, solutions } = S.solutions;
+  if (!count) { setStatus(`No solutions exist for ${describe(date, true)} with this piece set.`); return; }
+  // Pick a random solution different from the one on screen.
+  let next = Math.floor(Math.random() * count);
+  if (count > 1 && next === S.shown) next = (next + 1) % count;
+  S.shown = next;
+  const order = [...S.pieces].sort(() => Math.random() - 0.5);
+  order.forEach((pc, k) => {
+    const target = solutions[next][pc.i];
+    const key = cellKey(target);
+    // Choose the orientation that matches with the least spinning.
+    let best = null;
+    for (const f of [pc.flip, !pc.flip]) for (let k4 = 0; k4 < 4; k4++) {
+      if (cellKey(orient(pc.base, k4, f)) !== key) continue;
+      let d = mod(k4 - pc.rot, 4); if (d === 3) d = -1;
+      const cost = Math.abs(d) + (f !== pc.flip ? 1.5 : 0);
+      if (!best || cost < best.cost) best = { cost, d, f };
+    }
+    pc.rot += best.d; pc.flip = best.f;
+    const r0 = Math.min(...target.map(c => c[0])), c0 = Math.min(...target.map(c => c[1]));
+    pc.placed = [r0, c0]; pc.x = PAD + c0; pc.y = PAD + r0;
+    pc.el.style.transitionDelay = k * 70 + 'ms';
+    pc.el.style.zIndex = ++S.z;
+    render(pc);
+  });
+  setTimeout(() => S.pieces.forEach(pc => { pc.el.style.transitionDelay = ''; }), 1300);
+  select(null);
+  checkWin();
+}
+
+// ---------- Setup ----------
+function choosePuzzle(value) {
+  [S.p, S.s] = value.split(':').map(Number);
+  try { localStorage.setItem('pad-puzzle', value); } catch {}
+  S.solutions = null; S.shown = -1; S.trayH = 0;
+  buildPieces();
+  layout(false);
+  shuffle();
+}
+
+async function init() {
+  try { await loadWasm(); }
+  catch (e) {
+    setStatus(`<span id="error">Could not load puzzle_a_day.wasm (${e.message}). Serve this folder over http, or use standalone.html.</span>`);
+    return;
+  }
+  puzzles = readJSON(wasm.puzzles_json());
+  const sel = $('puzzle');
+  puzzles.forEach((p, pi) => p.sets.forEach((s, si) => {
+    if (s.name === 'test') return;
+    const name = p.name[0].toUpperCase() + p.name.slice(1);
+    const label = s.name.replace('set', 'Set ');
+    sel.add(new Option(`${name} · ${label[0].toUpperCase() + label.slice(1)}`, `${pi}:${si}`));
+  }));
+  let saved = null;
+  try { saved = localStorage.getItem('pad-puzzle'); } catch {}
+  if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
+  const t = new Date();
+  $('date').value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  $('footer').innerHTML = `Solver: Rust compiled to a ${(wasmSize / 1024).toFixed(0)} KB WebAssembly module, ` +
+    `using Knuth's Algorithm X with Dancing Links. Keys: <kbd>R</kbd> rotate, <kbd>F</kbd> flip, <kbd>S</kbd> solve.`;
+
+  sel.addEventListener('change', () => choosePuzzle(sel.value));
+  $('date').addEventListener('change', () => { S.solutions = null; S.shown = -1; drawBoard(); checkWin(); });
+  $('solve').addEventListener('click', solve);
+  $('shuffle').addEventListener('click', shuffle);
+  $('rotate').addEventListener('click', () => S.selected && rotate(S.selected));
+  $('flip').addEventListener('click', () => S.selected && flip(S.selected));
+  $('play').addEventListener('pointerdown', e => { if (e.target === $('play') || e.target.closest('#frame')) select(null); });
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, select')) return;
+    const k = e.key.toLowerCase();
+    if (k === 'r' && S.selected) rotate(S.selected, e.shiftKey ? -1 : 1);
+    else if (k === 'f' && S.selected) flip(S.selected);
+    else if (k === 's') solve();
+    else if (k === 'escape') select(null);
+  });
+  let resizeTimer;
+  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(layout, 100); });
+  $('solve').disabled = false;
+  choosePuzzle(sel.value);
+}
+init();
+</script>
+</body>
+</html>
